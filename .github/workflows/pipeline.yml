@@ -103,7 +103,7 @@ jobs:
           wait-on: http://localhost:8080
 
   deploy:
-    needs: [ test. e2e ]
+    needs: [ test, e2e ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
