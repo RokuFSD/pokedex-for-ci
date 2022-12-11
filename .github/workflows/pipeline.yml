@@ -11,13 +11,18 @@ on:
       - opened
       - synchronize
 jobs:
-  deploy:
+  avoid_redundancy:
     runs-on: ubuntu-latest
     steps:
       - name: Cancel Previous Redundant Runs
         uses: styfle/cancel-workflow-action@0.11.0
         with:
           access_token: ${{ github.token }}
+
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout
         uses: actions/checkout@v2.5.0
         with:
@@ -30,16 +35,81 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run eslint
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.5.0
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v3.5.1
+        with:
+          node-version: '14'
+      - name: Install dependencies
+        run: npm ci
       - name: Build
         run: npm run build
+      - uses: actions/upload-artifact@v2
+        with:
+          name: dist
+          path: dist
+
+  test:
+    needs: [ lint, build ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.5.0
+        with:
+        fetch-depth: 0
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v3.5.1
+        with:
+          node-version: '14'
+      - name: Install dependencies
+        run: npm ci
+      - uses: actions/download-artifact@v2
+        with:
+          name: dist
+          path: dist
       - name: Test
         run: npm run test
+
+  e2e:
+    needs: [ lint, build ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.5.0
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v3.5.1
+        with:
+          node-version: '14'
+      - name: Install dependencies
+        run: npm ci
+      - uses: actions/download-artifact@v2
+        with:
+          name: dist
+          path: dist
       - name: E2E tests
         uses: cypress-io/github-action@v5.0.0
         with:
           command: npm run test:e2e
           start: npm run dev
           wait-on: http://localhost:8080
+
+  deploy:
+    needs: [ test. e2e ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.5.0
+        with:
+          fetch-depth: 0
       - name: Deploy to Heroku
         if: ${{ github.event_name == 'push' }}
         uses: akhileshns/heroku-deploy@v3.12.12 # This is the action
